@@ -118,27 +118,21 @@ class GradeBlockReliabilityAssessment(object):
         results['score_spatial_confidence'] = (gbfactors['hole_entropies'] *
                 np.sqrt(gbfactors['gradeblock_coverage']) * sampling_densities)
 
-    def small_sample_analysis(self, chemistry, tol=1e-6, weights=np.r_[1.0,0.65,0.35]):
-        #A heuristic for estimating dispersion when sample size is small
+    def small_sample_analysis(self, chemistry, weights=np.r_[1.0,0.65,0.35]):
         conflict_score = 0.0
         eta_outliers = 0.0
         valid_assays = chemistry[np.logical_not(np.any(np.isnan(chemistry),axis=1))]
         median = np.median(valid_assays, axis=0)
         med_abs_dev = np.median(np.abs(valid_assays - median), axis=0)
+        z = (valid_assays - median) / med_abs_dev
         n_samples = len(valid_assays)
-        #outlier s.d. scaling factor
-        #  n_samples  |   2  |   4  |   8  |  16  |  32  | ... | inf |
-        #  multiplier |0.4104|0.7404| 1.131| 1.522| 1.870|     |  3  |
-        multiplier = 3*((2/np.pi)*np.arctan(np.sqrt(n_samples)))**4.0
-        features = np.where(med_abs_dev > tol)[0]
-        self.weights = weights[features] / sum(weights[features])
-        if len(features):
-            ratios = med_abs_dev[features] / median[features]
-            z_scores = (valid_assays[:,features] - median[features]) \
-                     / (med_abs_dev[features] + tol)
-            ind_outliers = np.sum(np.abs(z_scores) * self.weights, axis=1) > multiplier
-            eta_outliers = min((sum(ind_outliers > 0) + 1) / (float(n_samples) + 1), 0.5)
-            conflict_score = min(np.log(1 + multiplier * sum(self.weights * ratios)), 1.)
+        lambda_ = 9*((2/np.pi)*np.arctan(np.sqrt(n_samples)))**4.0
+        w = np.array(weights) / sum(weights)
+        s_outliers = np.array([np.dot(w, np.abs(z_ij)) > lambda_ for z_ij in z])
+        if sum(s_outliers) > 0:
+            r = np.mean(np.abs(valid_assays[s_outliers] - median), axis=0) / median
+            eta_outliers = sum(s_outliers > 0) / n_samples
+            conflict_score = min(np.log10(1 + lambda_ * np.dot(w,r)), 1.)
         return eta_outliers, conflict_score
 
     def compute_geochemical_consensus(self, chemistry, gbstats=None, gbfactors=None,
@@ -250,7 +244,7 @@ class GradeBlockReliabilityAssessment(object):
         #conditional update to avoid under-reporting
         if n_samples <= 3 * n_features:
             lb_eta_outliers, lb_rd_score = self.small_sample_analysis(
-                                         chemistry, weights=self.chemical_weights)
+                                           chemistry, weights=self.chemical_weights)
             details['lb_eta_outliers'] = lb_eta_outliers
             details['lb_rd_score'] = lb_rd_score
             ceiling_consensus = (1.0 - lb_eta_outliers) ** lb_rd_score
