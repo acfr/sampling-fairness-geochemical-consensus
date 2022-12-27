@@ -122,7 +122,8 @@ python example.py
 
 This work may be cited as:
 - Raymond Leung, "Measuring sampling fairness and geochemical consensus for blasthole
-  assays within grade-block mining units," 2022. DOI: https://doi.org/10.31224/2422. 
+  assays within grade-block mining units," Computers & Geosciences, 2023.
+  DOI: https://doi.org/10.1016/j.cageo.2022.105286. 
   Open-source implementation is available at https://github.com/raymondleung8/sampling-fairness-geochemical-consensus
   under a GPL-3.0 license.
 - The BibTeX entry may be copied from [here](citation.bib).
